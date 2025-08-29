@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Serverless Chatbot
+
+Globals:
+  Function:
+    Timeout: 300
+    MemorySize: 512
+    Environment:
+      Variables:
+        username: "postgresuser"
+        password: "ChangeMe123"
+        host: "localhost" # Change to your RDS endpoint
+        port: "5432"
+        database: "vector_store"
+
+Resources:
+  # API Gateway
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: Serverless Chatbot
+      Description: "Serverless Chatbot REST API Gateway"
+      EndpointConfiguration:
+        Type: REGIONAL
+      StageName: dev
+      DefinitionBody:
+        openapi: "3.0.1"
+        info:
+          title: "Serverless Chatbot AI"
+          version: "1.0.0"
+        paths:
+          /embedding:
+            post:
+              responses:
+                "200":
+                  description: "200 response"
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/Empty"
+              x-amazon-apigateway-integration:
+                type: "aws"
+                httpMethod: "POST"
+                uri: {"Fn::Sub":["arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${EmbeddingFunction.Arn}/invocations",{"Region":{"Ref": "AWS::Region"},"EmbeddingFunction":{"Ref": "EmbeddingFunction"}}]}
+                credentials:
+                  Fn::GetAtt: [HttpApiRole, Arn]
+                contentHandling: "CONVERT_TO_TEXT"
+                requestParameters:
+                  integration.request.header.X-Amz-Invocation-Type: "'Event'"
+                requestTemplates:
+                  application/json: |
+                    {
+                      "method": "$context.httpMethod",
+                      "body" : $input.json('$'),
+                      "headers": {
+                        #foreach($param in $input.params().header.keySet())
+                        "$param": "$util.escapeJavaScript($input.params().header.get($param))"
+                        #if($foreach.hasNext),#end
+                        #end
+                      }
+                    }
+                passthroughBehavior: "WHEN_NO_TEMPLATES"
+                responses:
+                  default:
+                    statusCode: "200"
+          /chat:
+            post:
+              responses:
+                "200":
+                  description: "200 response"
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/Empty"
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: {"Fn::Sub":["arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${ChatFunction.Arn}/invocations",{"Region":{"Ref": "AWS::Region"},"ChatFunction":{"Ref": "ChatFunction"}}]}
+                credentials:
+                  Fn::GetAtt: [HttpApiRole, Arn]
+                responses:
+                  default:
+                    statusCode: "200"
+                passthroughBehavior: "when_no_match"
+                timeoutInMillis: 29000
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+        components:
+          schemas:
+            Empty:
+              title: "Empty Schema"
+              type: "object"
+        x-amazon-apigateway-cors:
+          allowMethods:
+          - "*"
+          maxAge: 0
+          allowCredentials: false
+          allowOrigins:
+          - "*"
+        x-amazon-apigateway-importexport-version: "1.0"
+
+  # Function
+  ChatFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: app.handler
+      CodeUri: lambdas/chat/
+      Runtime: python3.12
+      Layers:
+        - !Ref LangchainPythonLayer
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:Rerank
+              Resource: '*'
+
+  EmbeddingFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: app.handler
+      CodeUri: lambdas/embedding/
+      Runtime: python3.12
+      Timeout: 600
+      Layers:
+        - !Ref LangchainPythonLayer
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:Rerank
+              Resource: '*'
+
+  # Layers
+  LangchainPythonLayer:
+    Type: 'AWS::Lambda::LayerVersion'
+    Properties:
+      Description: 'Shared utilities for chat function'
+      Content: layers/langchain_py
+      CompatibleRuntimes:
+        - python3.12
+    Metadata:
+      BuildMethod: python3.12
+
+# Roles
+  HttpApiRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - apigateway.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+      - PolicyName: AllowSqsLambdaIntegration
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'lambda:InvokeFunction'
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - 'logs:CreateLogGroup'
+                - 'logs:CreateLogStream'
+                - 'logs:DescribeLogGroups'
+                - 'logs:DescribeLogStreams'
+                - 'logs:PutLogEvents'
+                - 'logs:GetLogEvents'
+                - 'logs:FilterLogEvents'
+              Resource: '*'
+
+Outputs:
+  HelloWorldApiURL:
+    Description: "API endpoint URL for Ask WB IC Chatbot AI"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/personal/chat"

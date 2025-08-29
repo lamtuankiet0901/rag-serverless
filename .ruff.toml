@@ -1,0 +1,11 @@
+line-length = 120
+target-version = "py39"
+
+[lint]
+select = ["ALL"]
+ignore = [
+    "D",
+    "S101",
+    "COM812",
+    "ISC001"
+]

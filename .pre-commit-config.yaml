@@ -1,0 +1,9 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: make-fmt
+        name: Format code
+        entry: bash -c 'make fmt path="$@"' --
+        language: system
+        files: ^lambdas/
+        pass_filenames: true

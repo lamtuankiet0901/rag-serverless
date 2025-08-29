@@ -1,0 +1,27 @@
+version = 0.1
+
+[default]
+[default.deploy.parameters]
+stack_name = "chatbot-serverless"
+region = "ap-southeast-2"
+s3_bucket = "rag-serverless-simple-bucket-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+confirm_changeset = false
+s3_prefix = "chatbot-serverless"
+image_repositories = []
+
+[default.build.parameters]
+cached = true
+parallel = true
+use_container = false
+
+[default.validate.parameters]
+lint = true
+
+[default.local_start_api]
+[default.local_start_api.parameters]
+warm_containers = "EAGER"
+
+[default.local_start_lambda]
+[default.local_start_lambda.parameters]
+warm_containers = "EAGER"
