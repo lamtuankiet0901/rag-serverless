@@ -27,10 +27,10 @@ if user_input := st.chat_input("Ask me anything..."):
     # Generate response from RAG
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            api_url = "http://localhost:8000/retrieve"  # Change to your actual API endpoint from API Gateway
-            response = requests.post(api_url, json={"query": user_input})
+            api_url = "https://tkbqlvbuvl.execute-api.ap-southeast-2.amazonaws.com/dev/chat"  # Change to your actual API endpoint from API Gateway
+            response = requests.post(api_url, json={"text": user_input})
             if response.status_code == 200:
-                rag_response = response.json().get("response", "")
+                rag_response = response.json().get("text", "")
             else:
                 rag_response = "Sorry, I couldn't retrieve a response from the API."
             st.markdown(rag_response)

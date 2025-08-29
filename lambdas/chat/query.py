@@ -19,15 +19,21 @@ async def retrieve_documents(query: str, connection_string: str, table: str) -> 
         connection_string=connection_string,
         table=table
     )
+    print("Vector store loaded.")
 
     retrieval_qa_chat_prompt = ChatPromptTemplate.from_messages([
         ("system", "Use the following documents to answer the user's question. If you don't know the answer, just say you don't know. Response in Vietnamese only."),
         ("user", "Question: {input}\n\nDocuments:\n{context}")
     ])
+    
     combine_docs_chain = create_stuff_documents_chain(llm, retrieval_qa_chat_prompt)
     retrival_chain = create_retrieval_chain(
         retriever=vector_store.as_retriever(), combine_docs_chain=combine_docs_chain
     )
 
+    print("Retrieval chain created.")
+
     result = retrival_chain.invoke(input={"input": query})
+    print("Retrieval complete.")
+    print(f"Result: {result['answer']}")
     return result['answer']

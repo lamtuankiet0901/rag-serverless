@@ -43,6 +43,7 @@ pydantic = "^2.9.2"
 requests = "^2.32.4"
 psycopg-binary = "^3.2.9"
 pinecone = "^7.3.0"
+greenlet = "^3.2.4"
 
 
 [build-system]

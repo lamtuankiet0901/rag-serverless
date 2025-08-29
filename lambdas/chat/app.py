@@ -5,11 +5,10 @@ import asyncio
 from aws_lambda_powertools import Logger, Tracer
 from aws_xray_sdk.core import xray_recorder
 from query import retrieve_documents
-from aws_env import load_secrets_as_env_vars
+import json
 
 logger = Logger()
 tracer = Tracer()
-load_secrets_as_env_vars(os.getenv("SECRET_NAME"))
 
 POSTGRES_USER = os.getenv("username")
 POSTGRES_PASSWORD = os.getenv("password")
@@ -29,20 +28,29 @@ CONNECTION_STRING = (
 def handler(event, context):
     logger.info(f"cryptography __version__: {cryptography.__version__}")
     logger.info(event)
-    user_content = event["text"]
+    user_content = event.get("body", {})
+    if isinstance(user_content, str):
+        user_content = json.loads(user_content)
+    user_content = user_content.get("text", "")
 
     try:
         # Call LLM to get response
         message = asyncio.run(retrieve_documents(user_content, CONNECTION_STRING, TABLE_NAME))
-
+        logger.info(f"LLM response: {message}")
         return {
             "statusCode": 200,
-            "text": message,
+            "headers": {
+            "Content-Type": "application/json"
+            },
+            "body": json.dumps({"text": message}),
         }
 
     except Exception as e:
         logger.error(f"Error call LLM function: {str(e)}")
         return {
             "statusCode": 500,
-            "error": str(e),
+            "headers": {
+            "Content-Type": "application/json"
+            },
+            "body": json.dumps({"text": "Xin lỗi, đã có lỗi xảy ra trong quá trình xử lý yêu cầu của bạn."}),
         }
